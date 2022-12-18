@@ -1,0 +1,22 @@
+.encryptedKey.json
+node_modules
+.env
+.env.example
+coverage
+coverage.json
+typechain
+
+# tinker code
+___*.*
+
+# vscode
+.vscode
+
+#Hardhat files
+cache
+artifacts
+.DS_Store
+gas-report.txt
+deployments
+
+.notes.md
