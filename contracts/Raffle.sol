@@ -8,6 +8,8 @@
 
 pragma solidity ^0.8.17;
 
+// import, use and override chainlink APIs to do oracle randomness
+// in doing so, it's chainlink contracts calling the override function and pays the gas
 import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/KeeperCompatibleInterface.sol";
@@ -17,6 +19,12 @@ error Raffle__TransferFailed();
 error Raffle__NotOpen();
 error Raffle__UpkeepNotNeeded(uint256 currentBalance, uint256 numPlayers, uint256 raffleState);
 
+/**
+ * @title A sample Raffle Contract
+ * @author
+ * @notice This contract is for creating a sample raffle contract
+ * @dev This implements the Chainlink VRF Version 2
+ */
 contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
     /* Type Variables */
     enum RaffleState {
@@ -25,7 +33,7 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
     } // uint256 0 = OPEN, 1 = CALCULATING
 
     /* State Variables */
-    uint256 private immutable i_entranceFee;
+    uint256 private immutable i_entranceFee; // use private immutable if assign value once and never change
     address payable[] private s_players;
     VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
     bytes32 private immutable i_gasLane;
@@ -55,7 +63,7 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
         uint256 interval
     ) VRFConsumerBaseV2(vrfCoordinatorV2) {
         i_entranceFee = entranceFee;
-        i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2);
+        i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2); // based on the input "vrfCoordinatorV2" to get VRFCoordinatorV2Interface object, then assign the objet to "vrfCoordinator"
         i_gasLane = gasLane;
         i_subscriptionId = subscriptionId;
         i_callbackGasLimit = callbackGasLimit;
@@ -73,6 +81,8 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
             revert Raffle__NotOpen();
         }
         s_players.push(payable(msg.sender));
+        // Emit an events when we update a dynamic array or mapping
+        // Named events with the function name reversed
         emit RaffleEnter(msg.sender);
     }
 
@@ -85,6 +95,7 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
      * 3. Our subscription is funded with LINK
      * 4. The lottery should be in an "open" state.
      */
+    // chainlink calls this override function
     function checkUpkeep(
         bytes memory /* checkData */
     ) public override returns (bool upkeepNeeded, bytes memory /* performData */) {
@@ -93,13 +104,20 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
         bool hasPlayers = (s_players.length > 0);
         bool hasBalance = address(this).balance > 0;
         upkeepNeeded = (isOpen && timePassed && hasPlayers && hasBalance);
+        // block.timestamp -> return the current timestamp of the block on the chain
+        // block.timestamp - last block timestamp
+        // (block.timestamp - last block timestamp) > interval
     }
 
+    // chainlink calls this override function
     function performUpkeep(bytes calldata /* performData */) external override {
+        // Request the random number
+        // Once we get it, do something with it
+        // 2 transaction process
         (bool upkeepNeeded, ) = checkUpkeep("");
         if (!upkeepNeeded) {
             revert Raffle__UpkeepNotNeeded(
-                address(this).balance,
+                address(this).balance, // the balance of this/current contract
                 s_players.length,
                 uint256(s_raffleState)
             );
@@ -112,13 +130,30 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
             i_callbackGasLimit,
             NUM_WORDS
         );
+
+        // In i_vrfCoordinator.requestRandomWords() above, emit first event --> event[0]
+        // emit RequestedRaffleWinner(requestId) below, emit second event --> event[1]
+        // So in Raffle.test.js, it can reference either txReceipt.events[0].args.requestId or
+        // txReceipt.events[1].args.requestId, both will return the same requestId
+
+        // This is redundant. requestRandomWords() in VRFCoordinatorV2Mock.sol also emit requestId
+        // This could be removed. Only for learning / illustration purpose
         emit RequestedRaffleWinner(requestId);
     }
 
+    // chainlink calls this override function
+    // override fulfillRandomWords function in @chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol
     function fulfillRandomWords(
         uint256 /*requestId*/,
         uint256[] memory randomWords
     ) internal override {
+        // s_players size 10
+        // randomNumer 202
+        // 202 % 10 ? what's doesn't divide evenly into 202?
+        // 20 * 10 = 200
+        // 2
+        // 202 % 2 = 2
+
         uint256 indexOfWinner = randomWords[0] % s_players.length;
         address payable recentWinner = s_players[indexOfWinner];
         s_recentWinner = recentWinner;
@@ -164,5 +199,9 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
 
     function getRequestConfirmations() public pure returns (uint256) {
         return REQUEST_CONFIRMATIONS;
+    }
+
+    function getInterval() public view returns (uint256) {
+        return i_interval;
     }
 }

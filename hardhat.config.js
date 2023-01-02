@@ -30,6 +30,18 @@ module.exports = {
             blockConfirmations: 6,
         },
     },
+    gasReporter: {
+        //enabled: true,
+        enabled: false,
+        outputFile: "gas-report.txt",
+        noColors: true,
+        currency: "USD",
+        //coinmarketcap: COINMARKETCAP_API_KEY,
+        //token: "ETH",
+    },
+    etherscan: {
+        apiKey: ETHERSCAN_API_KEY,
+    },
     namedAccounts: {
         deployer: {
             default: 0,
@@ -37,5 +49,8 @@ module.exports = {
         player: {
             default: 1,
         },
+    },
+    mocha: {
+        timeout: 300000, // 300 seconds max for running tests
     },
 }
