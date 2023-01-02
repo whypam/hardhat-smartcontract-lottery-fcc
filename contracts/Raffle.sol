@@ -53,6 +53,19 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
     event RequestedRaffleWinner(uint256 indexed requestId);
     event WinnerPicked(address indexed winner);
 
+    // declare "event RandomWordsRequested(...)" to catch the event being emitted by
+    // i_vrfCoordinatorV2.requestRandomWords(...) in VRFCoordinatorV2Mock.sol
+    event RandomWordsRequested(
+        bytes32 indexed keyHash,
+        uint256 requestId,
+        uint256 preSeed,
+        uint64 indexed subId,
+        uint16 minimumRequestConfirmations,
+        uint32 callbackGasLimit,
+        uint32 numWords,
+        address indexed sender
+    );
+
     /* Functions */
     constructor(
         address vrfCoordinatorV2, // contract
@@ -131,14 +144,19 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
             NUM_WORDS
         );
 
+        // Ref: https://github.com/smartcontractkit/full-blockchain-solidity-course-js/discussions/1947
         // In i_vrfCoordinator.requestRandomWords() above, emit first event --> event[0]
         // emit RequestedRaffleWinner(requestId) below, emit second event --> event[1]
         // So in Raffle.test.js, it can reference either txReceipt.events[0].args.requestId or
         // txReceipt.events[1].args.requestId, both will return the same requestId
+        // However, Raffle.sol will need to declare "event RandomWordsRequested(...)" to catch the event being emitted by
+        // i_vrfCoordinatorV2.requestRandomWords(...) in VRFCoordinatorV2Mock.sol
+        // Doing so, it is redundant to "emit RequestedRaffleWinner(requestId)"
+        // Thus, just do either one
 
         // This is redundant. requestRandomWords() in VRFCoordinatorV2Mock.sol also emit requestId
         // This could be removed. Only for learning / illustration purpose
-        emit RequestedRaffleWinner(requestId);
+        // emit RequestedRaffleWinner(requestId);
     }
 
     // chainlink calls this override function

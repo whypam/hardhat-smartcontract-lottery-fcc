@@ -115,12 +115,20 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
                   await network.provider.send("evm_mine", [])
                   const txResponse = await raffle.performUpkeep([])
                   const txReceipt = await txResponse.wait(1)
-                  const requestId = txReceipt.events[1].args.requestId
+                  const requestId = txReceipt.events[0].args.requestId
                   const raffleState = await raffle.getRaffleState()
-                  // In Raffler.sol, i_vrfCoordinator.requestRandomWords(), emit first event --> event[0]
+                  // Ref: https://github.com/smartcontractkit/full-blockchain-solidity-course-js/discussions/1947
+                  // In Raffler.sol, inside performUpkeep(), i_vrfCoordinator.requestRandomWords(), emit first event --> event[0]
                   // emit RequestedRaffleWinner(requestId), emit second event --> event[1]
                   // So in Raffle.test.js, it can reference either txReceipt.events[0].args.requestId or
                   // txReceipt.events[1].args.requestId, both will return the same requestId
+                  // However, Raffle.sol will need to declare "event RandomWordsRequested(...)" to catch the event being emitted by
+                  // i_vrfCoordinatorV2.requestRandomWords(...) in VRFCoordinatorV2Mock.sol
+                  // Doing so, it is redundant to "emit RequestedRaffleWinner(requestId)"
+                  // Thus, just do either one
+                  // Removed "emit RequestedRaffleWinner(requestId)" from Raffle.sol
+                  console.log(`event[0] - ${txReceipt.events[0].args.requestId}`)
+                  //console.log(`event[1] - ${txReceipt.events[1].args.requestId}`)
                   assert(requestId.toNumber() > 0)
                   assert(raffleState.toString() == "1") // 0 = open, 1 = calculating
               })
@@ -161,9 +169,11 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
                   // performUpkeep (mock being Chainlink Keepers)
                   // fulfillRandomWords (mock being the Chainlink VRF)
                   // We will have to wait for the fulfillRandomWords to be called
+                  console.log("Setting up Promise...")
                   await new Promise(async (resolve, reject) => {
                       // listen to "event WinnerPicked(address indexed winner);" in Raffle.sol
                       // "event WinnerPicked()" is triggered by "emit WinnerPicked(recentWinner);" in fulfillRandomWords()
+                      console.log("Setting up Listener...")
                       raffle.once("WinnerPicked", async () => {
                           // set up listener
                           // assert throws an error if it fails, so we need to wrap
@@ -193,27 +203,28 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
                               )
                               resolve() // if try passes, resolves the promise
 
-                              /* for finding who the winner is
-                              console.log(`The winner is ${recentWinner}`)
-                              console.log(accounts[0].address)
-                              console.log(accounts[1].address)
-                              console.log(accounts[2].address)
-                              console.log(accounts[3].address)
-                              */
+                              //for finding who the winner is
+                              //console.log(`The winner is ${recentWinner}`)
+                              //console.log(accounts[0].address)
+                              //console.log(accounts[1].address)
+                              //console.log(accounts[2].address)
+                              //console.log(accounts[3].address)
                           } catch (e) {
                               reject(e) // if try falils, rejects the promise
                           }
                       })
                       // Setting up the listener - "raffle.once("WinnerPicked, () => {})"
                       // Then, below, we will fire the event, and the listener will pick it up, and resolve
+                      console.log("Entering Raffle...")
                       const tx = await raffle.performUpkeep([])
                       const txReceipt = await tx.wait(1)
+                      console.log("Ok, time to wait...")
                       const winnerStartingBalance = await accounts[1].getBalance()
                       // When "vrfCoordinatorV2Mock.fulfillRandomWords" gets called in VRFCoordinatorV2Mock.sol,
                       // "fulfillRandomsWords()" in Raffle.sol will override it and "emit WinnerPicked(recentWinner);",
                       // then trigger "event WinnerPicked(address indexed winner);"
                       await vrfCoordinatorV2Mock.fulfillRandomWords(
-                          txReceipt.events[1].args.requestId,
+                          txReceipt.events[0].args.requestId,
                           raffle.address
                       )
                   })

@@ -17,12 +17,15 @@ developmentChains.includes(network.name)
           describe("fulfillRandomWords", function () {
               it("Works with live Chainlink Keepers and Chainlink VFR, we get a random winner", async function () {
                   // enter the raffle
+                  console.log("Setting up test...")
                   const startingTimeStamp = await raffle.getLatestTimeStamp()
-                  const accounts = await ethers.getSigner()
+                  const accounts = await ethers.getSigners()
 
+                  console.log("Setting up Promise...")
                   await new Promise(async (resolve, reject) => {
                       // setup listener before we enter the raffle
                       // just in case the blockchain moves REALLY fast
+                      console.log("Setting up Listener...")
                       raffle.once("WinnerPicked", async () => {
                           console.log("WinnerPicked event fired!")
                           try {
@@ -37,7 +40,7 @@ developmentChains.includes(network.name)
                               assert.equal(raffleState, 0)
                               assert.equal(
                                   winnerEndingBalance.toString(),
-                                  winnerStartingBalance.add(raffleEntranceFee.toString())
+                                  winnerStartingBalance.add(raffleEntranceFee).toString()
                               )
                               assert(endingTimeStamp > startingTimeStamp)
                               resolve() // if try passes, resolves the promise
@@ -46,13 +49,16 @@ developmentChains.includes(network.name)
                               reject(e) // if try falils, rejects the promise
                           }
                       })
+                      // Then entering the raffle
+                      console.log("Entering Raffle...")
+                      const tx = await raffle.enterRaffle({ value: raffleEntranceFee })
+                      await tx.wait(1)
+                      console.log("Ok, time to wait...")
+                      const winnerStartingBalance = await accounts[0].getBalance()
+                      // and this code (after "await raffle.enterRaffle({ value: raffleEntranceFee })" is done,
+                      // it triggers the listener above
+                      // this "it" statement WON'T complete until our listener has finished listening!
                   })
-                  // Then entering the raffle
-                  await raffle.enterRaffle({ value: raffleEntranceFee })
-                  const winnerStartingBalance = await accounts[0].getBalance
-                  // and this code (after "await raffle.enterRaffle({ value: raffleEntranceFee })" is done,
-                  // it triggers the listener above
-                  // this "it" statement WON'T complete until our listener has finished listening!
               })
           })
       })
